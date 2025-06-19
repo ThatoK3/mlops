@@ -4,4 +4,5 @@ docker run -d -it --rm \
   -p 8888:8888 \
   --network=host \
   -v $(pwd):/home/jovyan/work \
+  -v $(pwd)/notebook_experiments/mlruns:/mlflow/mlruns \
   jupyter-mlops-exps  
