@@ -5,4 +5,4 @@ docker run -d \
   -e MYSQL_USER=mlflow \
   -e MYSQL_PASSWORD=mlflowpass \
   -p 3306:3306 \
-  mysql:8
+  thatojoe/mysql
