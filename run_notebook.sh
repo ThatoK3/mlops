@@ -1,3 +1,5 @@
+docker stop jupyter-nb-exps
+docker rm jupyter-nb-exps
 docker run -d -it --rm \
   --name jupyter-nb-exps \
   --user root -e GRANT_SUDO=yes\
