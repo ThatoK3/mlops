@@ -1,3 +1,5 @@
+docker stop mlflow-mysql
+docker rm mlflow-mysql
 docker run -d \
   --name mlflow-mysql \
   -e MYSQL_ROOT_PASSWORD=rootpass \

@@ -1,3 +1,5 @@
+docker stop mlflow-server
+docker rm mlflow-server
 docker run -d \
   --name mlflow-server \
   --network="host" \
