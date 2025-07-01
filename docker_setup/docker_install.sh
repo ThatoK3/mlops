@@ -40,10 +40,23 @@ sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin d
 sudo systemctl enable docker
 sudo systemctl start docker
 
-# Step 9: Add current user to docker group (optional but recommended)
+# Step 9: Allow Docker as non-root (Step 2577)
+echo -e "\nConfiguring Docker for non-root usage..."
+
+# Create docker group if it doesn't exist
+sudo groupadd docker || true
+
+# Add current user to docker group
 sudo usermod -aG docker "$USER"
 
+# Activate new group immediately (may not always work in all shells)
+newgrp docker << END
+echo "Testing Docker without sudo..."
+docker run hello-world || echo "x Failed to run Docker without sudo. Please reboot and try again."
+END
+
+# Final status
 echo -e "\n✅ Docker installation complete!"
-echo "You may need to log out and back in to use Docker without sudo."
 docker --version
+echo -e "\nIf you still can't run Docker without sudo, please reboot your system."
 
