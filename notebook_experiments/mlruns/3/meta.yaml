@@ -1,0 +1,4 @@
+experiment_id: 3
+name: "Recovered Experiment 3"
+artifact_location: file:///mlruns/3
+lifecycle_stage: active
