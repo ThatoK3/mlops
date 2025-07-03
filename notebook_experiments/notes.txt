@@ -1,0 +1,2 @@
+python ./work/notebook_experiments/SVM_StrokePrediction_MLflow.py
+jupyter nbconvert --to script [NB].ipynb
