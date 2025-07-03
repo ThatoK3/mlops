@@ -6,7 +6,7 @@ USER root
 # Install pip and apt packages
 RUN pip install --no-cache-dir \
         imbalanced-learn \
-        mlflow \
+        mlflow==2.22.1 \
         seaborn \
         lightgbm \
         xgboost \

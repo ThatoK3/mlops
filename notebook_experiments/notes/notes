@@ -1,0 +1,1 @@
+jupyter nbconvert SVM_StrokePrediction_MLflow.ipynb --to script
