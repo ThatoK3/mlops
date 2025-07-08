@@ -1,0 +1,17 @@
+DELIMITER $$
+
+CREATE PROCEDURE get_experiment_data(IN input_run_uuid VARCHAR(255))
+BEGIN
+    WITH experiment_metrics AS (
+        SELECT * FROM metrics WHERE run_uuid = input_run_uuid
+    ),
+    experiment_name AS (
+        SELECT run_uuid, name FROM runs
+    )
+    SELECT *
+    FROM experiment_metrics
+    LEFT JOIN experiment_name
+    ON experiment_metrics.run_uuid = experiment_name.run_uuid;
+END$$
+
+DELIMITER ;

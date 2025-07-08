@@ -2,3 +2,4 @@ mysqldump --single-transaction --routines --triggers --events -u root -prootpass
 mysql -u root -prootpass -h 103.6.171.147 -e "DROP DATABASE mysql_db;"
 mysql -u root -prootpass -h 103.6.171.147 -e "CREATE DATABASE mysql_db;"
 mysql -u root -prootpass -h 103.6.171.147 mlflow_db < backup.sql
+with experiment_metrics as (select * from metrics where run_uuid = "86f3f7c6a2a54692bafb592fd871a6b3"), experiment_name as (select run_uuid, name from runs ) select * from experiment_metrics left join experiment_name on experiment_metrics.run_uuid = experiment_name.run_uuid;
