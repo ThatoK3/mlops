@@ -1,0 +1,6 @@
+artifact_location: file:///home/jovyan/work/notebook_experiments/XGBoost/mlruns/732406108911946996
+creation_time: 1752057460711
+experiment_id: '732406108911946996'
+last_update_time: 1752057460711
+lifecycle_stage: active
+name: Stroke_Prediction_XGBoost

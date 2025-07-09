@@ -1,14 +1,14 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[20]:
+# In[ ]:
 
 
 # Install required packages
-#!pip install imbalanced-learn mlflow lightgbm
+#!pip install imbalanced-learn mlflow
 
 
-# In[15]:
+# In[1]:
 
 
 import pandas as pd
@@ -20,42 +20,36 @@ from sklearn.metrics import (accuracy_score, classification_report,
                            roc_auc_score, recall_score, f1_score,
                            precision_score, average_precision_score)
 from sklearn.preprocessing import StandardScaler
-from imblearn.over_sampling import SMOTE
-from imblearn.pipeline import Pipeline
+from sklearn.svm import SVC
 from sklearn.compose import ColumnTransformer
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.impute import SimpleImputer
-import lightgbm as lgb
+from sklearn.pipeline import Pipeline
 import joblib
 import mlflow
-import mlflow.lightgbm
 import warnings
 warnings.filterwarnings("ignore")
 
 
-# In[16]:
+# In[2]:
 
 
 # get_ipython().run_line_magic('cd', '/home/jovyan/')
 
 
-# In[17]:
+# In[3]:
 
 
 # Data Loading and Preprocessing
-df = pd.read_csv("work/notebook_experiments/healthcare-dataset-stroke-data.csv")
+df = pd.read_csv("../healthcare-dataset-stroke-data.csv")
 
 
-# In[18]:
+# In[4]:
 
 
 # Data Cleaning
 df["bmi"] = df["bmi"].fillna(df["bmi"].median())
 df = df[df['gender'] != 'Other']
-
-
-# In[19]:
-
 
 # Feature Selection
 selected_features = ['gender', 'age', 'hypertension', 'heart_disease',
@@ -82,7 +76,7 @@ df_fe['glucose_category'] = pd.cut(df_fe['avg_glucose_level'],
                                          'Diabetic', 'Severe'])
 
 
-# In[20]:
+# In[5]:
 
 
 # Identify feature types
@@ -91,19 +85,11 @@ categorical_cols = ['gender', 'smoking_status', 'age_group',
 numerical_cols = [col for col in df_fe.columns
                  if col not in categorical_cols + ['stroke']]
 
-
-# In[21]:
-
-
 # Preprocessing
 numeric_transformer = Pipeline(steps=[
     ('imputer', SimpleImputer(strategy='median')),
     ('scaler', StandardScaler())
 ])
-
-# Convert categorical columns to string type first
-for col in categorical_cols:
-    df_fe[col] = df_fe[col].astype(str)
 
 categorical_transformer = Pipeline(steps=[
     ('imputer', SimpleImputer(strategy='most_frequent')),
@@ -116,7 +102,7 @@ preprocessor = ColumnTransformer(transformers=[
 ])
 
 
-# In[25]:
+# In[6]:
 
 
 # Train-test split
@@ -126,51 +112,46 @@ X_train, X_test, y_train, y_test = train_test_split(
     X, y, test_size=0.2, random_state=42, stratify=y)
 
 # Calculate class weights
-class_weights = len(y_train[y_train == 0]) / len(y_train[y_train == 1])
+class_weights = {1: len(y_train[y_train == 0]) / len(y_train[y_train == 1]),
+                0: 1.0}  # Inverse ratio for minority class
 
 
-
-# In[26]:
+# In[9]:
 
 
 # MLflow Experiment
-mlflow.set_experiment("Stroke_Prediction_LightGBM")
+mlflow.set_experiment("Stroke_Prediction_SVM")
 mlflow.set_tracking_uri("http://103.6.171.147:5000")
 
-# MLflow Experiment - bug workaround
-mlflow.set_experiment("Stroke_Prediction_LightGBM")
+# MLflow Experiment -- bug workaround
+mlflow.set_experiment("Stroke_Prediction_SVM")
 mlflow.set_tracking_uri("http://103.6.171.147:5000")
 
-mlflow.lightgbm.autolog()
-
-# In[12]:
+# In[10]:
 
 
-with mlflow.start_run(run_name="Stroke_Prediction_LightGBM_v1"):
-    # LightGBM pipeline - removing categorical_feature parameter
-    lgb_pipeline = Pipeline(steps=[
+with mlflow.start_run(run_name="Stroke_Prediction_SVM_v1"):
+    # SVM Pipeline
+    svm_pipeline = Pipeline(steps=[
         ('preprocessor', preprocessor),
-        ('smote', SMOTE(random_state=42)),
-        ('classifier', lgb.LGBMClassifier(
-            objective='binary',
+        ('classifier', SVC(
+            kernel='rbf',
+            class_weight=class_weights,
+            probability=True,  # Enable probability estimates
             random_state=42,
-            scale_pos_weight=class_weights,
-            n_estimators=200,
-            max_depth=5,
-            learning_rate=0.05,
-            metric='aucpr',
-            verbosity=-1
+            gamma='scale',
+            C=1.0
         ))
     ])
 
     mlflow.set_tag("mlflow.user", "Thato")
 
     # Train model
-    lgb_pipeline.fit(X_train, y_train)
+    svm_pipeline.fit(X_train, y_train)
 
     # Predictions
-    y_pred = lgb_pipeline.predict(X_test)
-    y_proba = lgb_pipeline.predict_proba(X_test)[:, 1]
+    y_pred = svm_pipeline.predict(X_test)
+    y_proba = svm_pipeline.predict_proba(X_test)[:, 1]
 
     # Metrics
     metrics = {
@@ -182,39 +163,46 @@ with mlflow.start_run(run_name="Stroke_Prediction_LightGBM_v1"):
         'pr_auc': average_precision_score(y_test, y_proba)
     }
 
+    # Log parameters
+    mlflow.log_params({
+        'kernel': 'rbf',
+        'class_weight': class_weights,
+        'gamma': 'scale',
+        'C': 1.0
+    })
+
     # Log metrics
     mlflow.log_metrics(metrics)
 
-    # Log parameters
-    mlflow.log_params({
-        'n_estimators': 200,
-        'max_depth': 5,
-        'learning_rate': 0.05,
-        'scale_pos_weight': class_weights
-    })
-
     # Save model
-    joblib.dump(lgb_pipeline, "lightgbm_model.pkl")
-    mlflow.sklearn.log_model(lgb_pipeline, "model")
+    joblib.dump(svm_pipeline, "svm_model.pkl")
+    mlflow.sklearn.log_model(svm_pipeline, "svm_model")
 
     # Results
-    print("\n--- LightGBM Classifier ---")
+    print("\n--- SVM Classifier ---")
     print(classification_report(y_test, y_pred, digits=4))
     print(f"ROC-AUC: {metrics['roc_auc']:.4f}")
     print(f"PR-AUC: {metrics['pr_auc']:.4f}")
 
-    # Feature Importance
+    # Feature Coefficients (for linear kernel)
     try:
-        lgb_model = lgb_pipeline.named_steps['classifier']
-        plt.figure(figsize=(10, 6))
-        lgb.plot_importance(lgb_model, importance_type='gain')
-        plt.title("LightGBM Feature Importance (Gain)")
-        plt.tight_layout()
-        plt.savefig("feature_importance.png")
-        mlflow.log_artifact("feature_importance.png")
-        plt.close()
+        if svm_pipeline.named_steps['classifier'].kernel == 'linear':
+            coefficients = svm_pipeline.named_steps['classifier'].coef_[0]
+            feature_names = (numerical_cols +
+                           list(svm_pipeline.named_steps['preprocessor']
+                               .named_transformers_['cat']
+                               .named_steps['encoder']
+                               .get_feature_names_out(categorical_cols)))
+
+            plt.figure(figsize=(10, 6))
+            plt.barh(feature_names, coefficients)
+            plt.title("SVM Feature Coefficients")
+            plt.tight_layout()
+            plt.savefig("feature_importance.png")
+            mlflow.log_artifact("feature_importance.png")
+            plt.close()
     except Exception as e:
-        print(f"Feature importance error: {str(e)}")
+        print(f"Feature coefficients not available for RBF kernel: {str(e)}")
 
     # Confusion Matrix
     from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
@@ -228,14 +216,15 @@ with mlflow.start_run(run_name="Stroke_Prediction_LightGBM_v1"):
 
     # PR Curve
     from sklearn.metrics import PrecisionRecallDisplay
-    PrecisionRecallDisplay.from_predictions(y_test, y_proba, name="LightGBM")
+    PrecisionRecallDisplay.from_predictions(y_test, y_proba, name="SVM")
     plt.title("Precision-Recall Curve")
     plt.savefig("pr_curve.png")
     mlflow.log_artifact("pr_curve.png")
     plt.close()
 
 
-# In[17]:
+# In[ ]:
+
 
 
 

@@ -1,23 +1,21 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# Random Forest experiment with MLflow tracking
-
-# In[13]:
-
-
-#!pip install mlflow
-#!pip install imbalanced-learn mlflow
-
-
 # In[1]:
+
+
+# Install required packages
+#!pip install imbalanced-learn mlflow seaborn
+
+
+# In[15]:
 
 
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, StratifiedKFold, GridSearchCV
 from sklearn.metrics import accuracy_score, classification_report, roc_auc_score, recall_score, f1_score, precision_score
 from sklearn.preprocessing import StandardScaler
 from imblearn.over_sampling import SMOTE
@@ -25,28 +23,28 @@ from imblearn.pipeline import Pipeline
 from sklearn.compose import ColumnTransformer
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.impute import SimpleImputer
+from sklearn.linear_model import LogisticRegression
 import joblib
-from sklearn.ensemble import RandomForestClassifier
 import mlflow
 import mlflow.sklearn
 import warnings
 warnings.filterwarnings("ignore")
 
 
-# In[2]:
+# In[16]:
 
 
 # get_ipython().run_line_magic('cd', '/home/jovyan/')
 
 
-# In[3]:
+# In[17]:
 
 
 # Data Loading and Preprocessing
-df = pd.read_csv("work/notebook_experiments/healthcare-dataset-stroke-data.csv")
+df = pd.read_csv("../healthcare-dataset-stroke-data.csv")
 
 
-# In[4]:
+# In[18]:
 
 
 # Data Cleaning
@@ -54,7 +52,7 @@ df["bmi"] = df["bmi"].fillna(df["bmi"].median())
 df = df[df['gender'] != 'Other']
 
 
-# In[5]:
+# In[19]:
 
 
 # Feature Selection
@@ -63,7 +61,7 @@ selected_features = ['gender', 'age', 'hypertension', 'heart_disease',
 df = df[selected_features]
 
 
-# In[6]:
+# In[20]:
 
 
 # Feature Engineering
@@ -87,7 +85,7 @@ glucose_labels = ['Hypoglycemia', 'Low Normal', 'Normal', 'Elevated', 'Pre-diabe
 df_fe['glucose_category'] = pd.cut(df_fe['avg_glucose_level'], bins=glucose_bins, labels=glucose_labels, right=False)
 
 
-# In[7]:
+# In[21]:
 
 
 # Defining categorical and numerical columns
@@ -111,7 +109,7 @@ preprocessor = ColumnTransformer(transformers=[
 ])
 
 
-# In[8]:
+# In[22]:
 
 
 # Train-test split
@@ -120,53 +118,77 @@ y = df_fe['stroke']
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
 
-# In[10]:
+# In[23]:
 
 
 # MLflow Experiment
-mlflow.set_experiment("Stroke_Prediction_RandomForest")
+mlflow.set_experiment("Stroke_Prediction_LogisticRegression")
 mlflow.set_tracking_uri("http://103.6.171.147:5000")
 
 # MLflow Experiment - bug workaround
-mlflow.set_experiment("Stroke_Prediction_RandomForest")
+mlflow.set_experiment("Stroke_Prediction_LogisticRegression")
 mlflow.set_tracking_uri("http://103.6.171.147:5000")
 
+# In[24]:
 
-# In[11]:
+
+# Parameter grid for GridSearch
+param_grid = {
+    'classifier__C': [0.01, 0.1, 1, 10, 100],
+    'classifier__solver': ['liblinear', 'saga'],
+    'classifier__penalty': ['l1', 'l2'],
+    'classifier__max_iter': [500, 1000, 2000],
+}
 
 
-with mlflow.start_run(run_name="Stroke_Prediction_RandomForest_v1"):
-    # Define and train model
-    rf_pipeline = Pipeline(steps=[
+# In[25]:
+
+
+with mlflow.start_run(run_name="Stroke_Prediction_LogisticRegression_v1"):
+    # Create pipeline
+    logreg_pipeline = Pipeline(steps=[
         ('preprocessing', preprocessor),
         ('smote', SMOTE(random_state=42)),
-        ('classifier', RandomForestClassifier(
-            n_estimators=200,
-            max_depth=10,
-            min_samples_split=5,
-            random_state=42
-        ))
+        ('classifier', LogisticRegression(class_weight='balanced', random_state=42))
     ])
 
     mlflow.set_tag("mlflow.user", "Thato")
 
-    rf_pipeline.fit(X_train, y_train)
+    # GridSearch with cross-validation
+    cv_strategy = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+    grid_search = GridSearchCV(
+        logreg_pipeline,
+        param_grid,
+        cv=cv_strategy,
+        scoring='recall',
+        verbose=2,
+        n_jobs=-1
+    )
+
+    # Train model
+    grid_search.fit(X_train, y_train)
+
+    # Get best model
+    best_logreg_model = grid_search.best_estimator_
 
     # Make predictions
-    y_pred_rf = rf_pipeline.predict(X_test)
-    y_proba_rf = rf_pipeline.predict_proba(X_test)[:, 1]
+    y_pred_lr = best_logreg_model.predict(X_test)
+    y_proba_lr = best_logreg_model.predict_proba(X_test)[:, 1]
+
+    # Threshold Tuning for Recall Boost
+    threshold = 0.3
+    y_pred_lr_thresh = (y_proba_lr >= threshold).astype(int)
 
     # Calculate metrics
-    accuracy = accuracy_score(y_test, y_pred_rf)
-    precision = precision_score(y_test, y_pred_rf, zero_division=0)
-    recall = recall_score(y_test, y_pred_rf)
-    f1 = f1_score(y_test, y_pred_rf)
-    roc_auc = roc_auc_score(y_test, y_proba_rf)
+    accuracy = accuracy_score(y_test, y_pred_lr_thresh)
+    precision = precision_score(y_test, y_pred_lr_thresh, zero_division=0)
+    recall = recall_score(y_test, y_pred_lr_thresh)
+    f1 = f1_score(y_test, y_pred_lr_thresh)
+    roc_auc = roc_auc_score(y_test, y_proba_lr)
 
     # Log parameters
-    mlflow.log_param("n_estimators", 200)
-    mlflow.log_param("max_depth", 10)
-    mlflow.log_param("min_samples_split", 5)
+    mlflow.log_params(grid_search.best_params_)
+    mlflow.log_param("threshold", threshold)
 
     # Log metrics
     mlflow.log_metric("accuracy", accuracy)
@@ -176,14 +198,17 @@ with mlflow.start_run(run_name="Stroke_Prediction_RandomForest_v1"):
     mlflow.log_metric("roc_auc", roc_auc)
 
     # Log model
-    mlflow.sklearn.log_model(rf_pipeline, "random_forest_model")
+    mlflow.sklearn.log_model(best_logreg_model, "logistic_regression_model")
 
     # Save model locally
-    joblib.dump(rf_pipeline, "Random_Forest.pkl")
+    joblib.dump(grid_search, "Logistic_Regression.pkl")
 
     # Print results
-    print("--- Random Forest ---")
-    print(classification_report(y_test, y_pred_rf, digits=4))
+    print("\nBest Hyperparameters found by GridSearchCV:")
+    print(grid_search.best_params_)
+
+    print("\n--- Logistic Regression (threshold=0.3) ---")
+    print(classification_report(y_test, y_pred_lr_thresh, digits=4))
     print("ROC-AUC:", roc_auc)
 
     # Log artifacts (plots)
@@ -195,14 +220,19 @@ with mlflow.start_run(run_name="Stroke_Prediction_RandomForest_v1"):
 
     # Confusion Matrix
     from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
-    cm = confusion_matrix(y_test, y_pred_rf)
+    cm = confusion_matrix(y_test, y_pred_lr_thresh)
     disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=["No Stroke", "Stroke"])
     fig, ax = plt.subplots(figsize=(6, 6))
     disp.plot(ax=ax, cmap="Blues", values_format='d')
-    plt.title("Confusion Matrix: Random Forest")
+    plt.title("Confusion Matrix: Logistic Regression")
     plt.tight_layout()
     plt.savefig("confusion_matrix.png")
     mlflow.log_artifact("confusion_matrix.png")
     plt.close()
+
+
+# In[ ]:
+
+
 
 

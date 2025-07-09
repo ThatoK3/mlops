@@ -1,0 +1,6 @@
+artifact_location: file:///home/jovyan/work/notebook_experiments/LightGBM/mlruns/629327677875321950
+creation_time: 1752056835845
+experiment_id: '629327677875321950'
+last_update_time: 1752056835845
+lifecycle_stage: active
+name: Stroke_Prediction_LightGBM

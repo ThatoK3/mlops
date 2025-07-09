@@ -41,7 +41,7 @@ warnings.filterwarnings("ignore")
 
 
 # Data Loading and Preprocessing
-df = pd.read_csv("work/notebook_experiments/healthcare-dataset-stroke-data.csv")
+df = pd.read_csv("../healthcare-dataset-stroke-data.csv")
 
 # Data Cleaning
 df["bmi"] = df["bmi"].fillna(df["bmi"].median())
