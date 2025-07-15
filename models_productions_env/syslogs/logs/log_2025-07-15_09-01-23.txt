@@ -1,0 +1,20 @@
+[Logger initialized] Logging to: syslogs/logs/log_2025-07-15_09-01-23.txt
+Fitting 5 folds for each of 60 candidates, totalling 300 fits
+[31m2025/07/15 09:02:16 WARNING mlflow.models.model: Model logged without a signature and input example. Please set `input_example` parameter when logging the model to auto infer the model signature.[0m
+
+Best Hyperparameters found by GridSearchCV:
+{'classifier__C': 0.01, 'classifier__max_iter': 500, 'classifier__penalty': 'l1', 'classifier__solver': 'liblinear'}
+
+--- Logistic Regression (threshold=0.3) ---
+              precision    recall  f1-score   support
+
+           0     0.9924    0.5406    0.6999       960
+           1     0.1162    0.9355    0.2068        62
+
+    accuracy                         0.5646      1022
+   macro avg     0.5543    0.7381    0.4534      1022
+weighted avg     0.9392    0.5646    0.6700      1022
+
+ROC-AUC: 0.847513440860215
+🏃 View run Stroke_Prediction_LogisticRegression_v1 at: http://103.6.171.147:5000/#/experiments/1/runs/a166285878cf4ca0ad8f35a069d1e9f9
+🧪 View experiment at: http://103.6.171.147:5000/#/experiments/1

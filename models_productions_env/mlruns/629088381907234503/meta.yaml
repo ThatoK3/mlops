@@ -1,0 +1,6 @@
+artifact_location: file:///home/jovyan/work/mlruns/629088381907234503
+creation_time: 1752569554610
+experiment_id: '629088381907234503'
+last_update_time: 1752569554610
+lifecycle_stage: active
+name: Stroke_Prediction_LogisticRegression

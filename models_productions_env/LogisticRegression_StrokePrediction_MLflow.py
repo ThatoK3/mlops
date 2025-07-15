@@ -23,6 +23,10 @@ import mlflow.sklearn
 import warnings
 warnings.filterwarnings("ignore")
 
+# sys logger
+from syslogs.logger import setup_logging
+setup_logging()
+
 from dotenv import load_dotenv
 import os
 
