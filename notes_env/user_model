@@ -1,0 +1,43 @@
+For stroke prediction, where false negatives (missing actual stroke cases) can be life-threatening, the priority should be on high recall (sensitivity) while maintaining reasonable precision to avoid too many false alarms.
+
+Key Considerations:
+Recall (Sensitivity) is Critical – Missing a stroke prediction could be fatal, so we want to minimize false negatives.
+
+Precision Matters but is Secondary – Too many false positives (predicting stroke when there isn’t one) can lead to unnecessary tests, but this is less critical than missing actual strokes.
+
+ROC-AUC is Important – Measures how well the model distinguishes between stroke and non-stroke cases.
+
+Performance Comparison (Ranked by Recall)
+Model	Recall	Precision	F1 Score	ROC-AUC	Accuracy
+LogisticRegression_v1	93.5%	11.6%	20.7%	84.7%	56.5%
+XGBoost_v1	78.0%	10.5%	18.4%	78.3%	66.2%
+SVM_v1	60.0%	11.5%	19.3%	76.6%	75.4%
+RandomForest_v1	35.5%	16.2%	22.2%	80.7%	84.9%
+LightGBM_v1	52.0%	10.1%	16.9%	76.6%	75.0%
+Best Choice for Stroke Prediction:
+✅ LogisticRegression_v1
+
+Highest Recall (93.5%) – Captures almost all true stroke cases.
+
+Best ROC-AUC (84.7%) – Strong overall discrimination ability.
+
+Low Precision (11.6%) is acceptable in medical screening (better to err on caution).
+
+Alternative if Precision Needs Improvement:
+🔹 XGBoost_v1
+
+Still high recall (78%) but better precision than LogisticRegression.
+
+Better balanced than SVM/RandomForest.
+
+Why Not RandomForest?
+Recall is too low (35.5%) – Missing ~65% of stroke cases is unacceptable for medical use.
+
+High accuracy is misleading due to class imbalance (most people don’t have strokes).
+
+Final Recommendation:
+Use LogisticRegression_v1 if the priority is maximizing detection of strokes (even with more false alarms).
+
+Use XGBoost_v1 if you need a better precision/recall tradeoff while still catching most strokes.
+
+Avoid RandomForest despite its high accuracy—it misses too many critical cases.
