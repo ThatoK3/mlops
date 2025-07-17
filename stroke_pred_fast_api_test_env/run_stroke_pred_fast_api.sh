@@ -16,7 +16,7 @@ docker run -d \
   -v "$(pwd)/models:/app/models" \
   -v "$(pwd)/fast_api/.env:/app/fast_api/.env" \
   -w /app/fast_api \
-  stroke-prediction-api
+  thatojoe/stroke-prediction-api
 
 echo "API container running in background"
 echo "Access the API at http://localhost:8000"
