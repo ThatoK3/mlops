@@ -7,20 +7,71 @@ from typing import Optional
 import os
 from dotenv import load_dotenv
 from pathlib import Path
+from datetime import datetime
+import mysql.connector
+from mysql.connector import Error
+import json
 
-
-# Load .env from the same directory as main.py
+# Load environment variables
 env_path = Path(__file__).parent / ".env"
 load_dotenv(dotenv_path=env_path)
-
 
 app = FastAPI(title="Stroke Prediction API",
               description="API for predicting stroke risk based on health metrics",
               version="1.0")
 
+# Database connection function
+def get_db_connection():
+    try:
+        connection = mysql.connector.connect(
+            host=os.getenv("DB_HOST"),
+            port=os.getenv("DB_PORT"),
+            database=os.getenv("DB_NAME"),
+            user=os.getenv("DB_USER"),
+            password=os.getenv("DB_PASSWORD")
+        )
+        return connection
+    except Error as e:
+        raise RuntimeError(f"Error connecting to MySQL: {e}")
+
+# Create predictions table if not exists
+def init_db():
+    connection = None
+    try:
+        connection = get_db_connection()
+        cursor = connection.cursor()
+        
+        create_table_query = """
+        CREATE TABLE IF NOT EXISTS predictions (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+            gender VARCHAR(10),
+            age FLOAT,
+            hypertension BOOLEAN,
+            heart_disease BOOLEAN,
+            avg_glucose_level FLOAT,
+            bmi FLOAT,
+            smoking_status VARCHAR(20),
+            probability FLOAT,
+            risk_category VARCHAR(10),
+            contributing_factors JSON,
+            prediction_data JSON
+        )
+        """
+        cursor.execute(create_table_query)
+        connection.commit()
+    except Error as e:
+        raise RuntimeError(f"Error initializing database: {e}")
+    finally:
+        if connection and connection.is_connected():
+            cursor.close()
+            connection.close()
+
+# Initialize database on startup
+init_db()
+
 # Model loading with proper path resolution
 model_path = Path(__file__).parent / os.getenv("SAVED_MODEL")
-
 try:
     model = joblib.load(model_path)
 except Exception as e:
@@ -42,6 +93,44 @@ class PatientData(BaseModel):
     glucose_category: Optional[str] = None
     age_hypertension: Optional[float] = None
 
+def save_prediction_to_db(data: dict, prediction_result: dict):
+    connection = None
+    try:
+        connection = get_db_connection()
+        cursor = connection.cursor()
+        
+        insert_query = """
+        INSERT INTO predictions (
+            gender, age, hypertension, heart_disease,
+            avg_glucose_level, bmi, smoking_status,
+            probability, risk_category, contributing_factors,
+            prediction_data
+        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        """
+        
+        cursor.execute(insert_query, (
+            data['gender'],
+            data['age'],
+            bool(data['hypertension']),
+            bool(data['heart_disease']),
+            data['avg_glucose_level'],
+            data['bmi'],
+            data['smoking_status'],
+            prediction_result['probability'],
+            prediction_result['risk_category'],
+            json.dumps(prediction_result['contributing_factors']),
+            json.dumps(data)
+        ))
+        
+        connection.commit()
+        return cursor.lastrowid
+    except Error as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {e}")
+    finally:
+        if connection and connection.is_connected():
+            cursor.close()
+            connection.close()
+
 @app.get("/")
 def read_root():
     return {"message": "Stroke Prediction API"}
@@ -55,6 +144,7 @@ def predict_stroke_risk(patient_data: PatientData):
         - Probability of stroke (0-1)
         - Risk category (Low/Medium/High)
         - Key contributing factors
+        - Prediction ID from database
     """
     try:
         # Convert input data to DataFrame
@@ -110,14 +200,51 @@ def predict_stroke_risk(patient_data: PatientData):
         else:
             contributing_factors = ["Feature importance not available"]
         
-        return {
+        prediction_result = {
             "probability": float(probability),
             "risk_category": risk,
             "contributing_factors": contributing_factors
         }
         
+        # Save to database
+        prediction_id = save_prediction_to_db(input_data, prediction_result)
+        prediction_result['prediction_id'] = prediction_id
+        
+        return prediction_result
+        
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+@app.get("/predictions")
+def get_predictions(limit: int = 10):
+    """
+    Retrieve stored predictions
+    Parameters:
+        - limit: Number of predictions to return (default: 10)
+    """
+    connection = None
+    try:
+        connection = get_db_connection()
+        cursor = connection.cursor(dictionary=True)
+        
+        query = "SELECT * FROM predictions ORDER BY timestamp DESC LIMIT %s"
+        cursor.execute(query, (limit,))
+        results = cursor.fetchall()
+        
+        # Convert JSON strings back to objects
+        for row in results:
+            if row['contributing_factors']:
+                row['contributing_factors'] = json.loads(row['contributing_factors'])
+            if row['prediction_data']:
+                row['prediction_data'] = json.loads(row['prediction_data'])
+        
+        return results
+    except Error as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {e}")
+    finally:
+        if connection and connection.is_connected():
+            cursor.close()
+            connection.close()
 
 @app.get("/model_info")
 def get_model_info():

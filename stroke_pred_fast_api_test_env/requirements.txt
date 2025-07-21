@@ -7,3 +7,5 @@ joblib
 imbalanced-learn
 lightgbm
 xgboost
+mysql-connector-python
+python-multipart
