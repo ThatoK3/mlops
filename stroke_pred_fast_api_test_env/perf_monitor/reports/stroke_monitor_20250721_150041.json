@@ -1,0 +1,12 @@
+{
+  "timestamp": "2025-07-21T15:00:41.610285",
+  "time_period": "Last 7 days",
+  "status": "partial",
+  "performance_metrics": null,
+  "data_drift": null,
+  "volume_trend": null,
+  "alerts": [],
+  "warnings": [
+    "No predictions found in time period"
+  ]
+}
